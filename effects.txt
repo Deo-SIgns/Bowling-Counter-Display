@@ -31,12 +31,12 @@ laser = 9          # laser tag battle (heavy)
 bowling = 7        # strike across all four TVs
 invasion = 7       # pixel aliens and HIGH SCORE
 flag = 6           # checkered flag wipe and a kart race
-playcard = 6       # the Playcard slides across throwing coins (heavy)
+# playcard = 6       # the Playcard slides across throwing coins (heavy)
 
 # --- Big effects ---
 tsunami = 6        # wave with a surfing mascot (heavy)
 fireworks = 6      # fireworks over the wall (heavy)
-confetti = 5       # confetti cannons (heavy)
+# confetti = 5       # confetti cannons (heavy)
 burn = 5           # wall burns to the message, then back (heavy)
 crack = 5          # mascot smacks the glass and it cracks
 blackout = 5       # lights out, neon signs flicker on (heavy)
