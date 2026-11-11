@@ -1062,6 +1062,31 @@ async function loadText(){
 loadText();
 setInterval(loadText, CONFIG.checkMinutes*60000);
 
+
+/* ---------- reload itself when index.html changes on GitHub ---------- */
+// Videos, text.txt and effects.txt are picked up live. A new index.html needs a page reload,
+// so check whether the page itself has changed and reload at a quiet moment (never mid-surprise).
+let pageStamp = null, reloadPending = false;
+async function pageVersion(){
+  const r = await fetch(location.pathname + '?v=' + Date.now(), { method: 'HEAD', cache: 'no-store' });
+  if (!r.ok) return null;
+  return r.headers.get('etag') || r.headers.get('last-modified') || r.headers.get('content-length');
+}
+async function checkPage(){
+  if (reloadPending) return;
+  try {
+    const v = await pageVersion();
+    if (!v) return;
+    if (pageStamp === null){ pageStamp = v; return; }
+    if (v !== pageStamp){
+      reloadPending = true;
+      const wait = setInterval(() => { if (!busy){ clearInterval(wait); location.reload(); } }, 1000);
+    }
+  } catch (e) {}
+}
+checkPage();
+setInterval(checkPage, CONFIG.checkMinutes*60000);
+
 /* ---------- random scheduler ---------- */
 const EVENTS = { drive: driveMascot, laser: laserTag, bowling: bowlingStrike, invasion: arcadeInvasion, bumper: bumperCars, pitstop: pitStop,
   flyby: deoFlyby, flag: checkeredFlag, playcard: playcardSwipe, peek, tsunami, fireworks, burn, crack: screenCrack, confetti, blackout, glitch };
