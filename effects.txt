@@ -1,0 +1,43 @@
+# ============================================================
+#  WHICH SURPRISES PLAY ON THE BOWLING COUNTER DISPLAY
+# ============================================================
+#
+#  HOW TO TURN ONE OFF
+#   Put a # at the start of its line. Remove the # to turn it back on.
+#
+#  HOW OFTEN EACH ONE PLAYS
+#   The number after = is how likely it is to be picked, compared with
+#   the others. 12 comes up about twice as often as 6. Leave the number
+#   off (just the name) to use the normal amount.
+#
+#  Changes show up on the wall in about 10 minutes.
+#  Effects marked (heavy) work the computer hardest. If the videos
+#  stutter during surprises, turn those off first.
+# ============================================================
+
+# --- How long to wait between surprises, in minutes ---
+# A random time between the two numbers. Example: 1 - 3
+minutes_between = 1 - 3
+
+# --- Characters ---
+peek = 12          # Deo or the hot dog guy pops in from an edge and ducks out
+drive = 12         # go-karts drive across: solo, race or chase
+bumper = 7         # bumper cars collide in the middle (BONK!)
+pitstop = 7        # hot dog guy pulls over with the Pitstop sign
+flyby = 7          # Deo flies across towing a banner
+laser = 9          # laser tag battle (heavy)
+
+# --- Attractions ---
+bowling = 7        # strike across all four TVs
+invasion = 7       # pixel aliens and HIGH SCORE
+flag = 6           # checkered flag wipe and a kart race
+playcard = 6       # the Playcard slides across throwing coins (heavy)
+
+# --- Big effects ---
+tsunami = 6        # wave with a surfing mascot (heavy)
+fireworks = 6      # fireworks over the wall (heavy)
+confetti = 5       # confetti cannons (heavy)
+burn = 5           # wall burns to the message, then back (heavy)
+crack = 5          # mascot smacks the glass and it cracks
+blackout = 5       # lights out, neon signs flicker on (heavy)
+glitch = 4         # broken-monitor flicker (heavy)

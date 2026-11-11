@@ -15,8 +15,8 @@ body{display:flex;flex-direction:column;justify-content:center}
 .layer{position:absolute;inset:0;-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
 .slot{position:absolute;top:0;height:1080px;overflow:hidden}
 .slot.left{left:0;width:1920px}.slot.center{left:1920px;width:3840px}.slot.right{left:5760px;width:1920px}
-.slot video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;opacity:0;background:#000}
-.slot video.on{opacity:1}
+.slot video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;visibility:hidden;background:#000}
+.slot video.on{visibility:visible}
 .phwrap{position:absolute;inset:0}
 #fire{position:absolute;left:0;top:0;width:7680px;height:1080px;pointer-events:none;z-index:5;display:none}
 #mascotLayer{position:absolute;inset:0;z-index:10;pointer-events:none}
@@ -183,7 +183,7 @@ body.kiosk{cursor:none}
   <button id="bBez">Bezels: on</button>
   <span id="status"></span>
 </div>
-<div id="info"><span id="vidStatus">Looking for videos…</span> · <span id="txtStatus"></span><br><span id="nowStatus"></span><br>Deo and the hot dog guy are rough cutouts from the promo art. Pick a surprise and hit Play, or wait and they fire on their own at random. Turn your phone sideways for a bigger view.</div>
+<div id="info"><span id="vidStatus">Looking for videos…</span> · <span id="txtStatus"></span> · <span id="fxStatus"></span><br><span id="nowStatus"></span><br>Deo and the hot dog guy are rough cutouts from the promo art. Pick a surprise and hit Play, or wait and they fire on their own at random. Turn your phone sideways for a bigger view.</div>
 
 <script>
 /* =================== CONFIG — edit this part =================== */
@@ -268,7 +268,12 @@ function showPlaceholder(s){
 // Move a screen to its next clip. Two players are stacked: one plays while the other has the next clip loaded and waiting, so the switch has no black flash.
 function advance(s){
   if (!s.list.length) return showPlaceholder(s);
-  if (s.fails >= s.list.length){ s.fails = 0; showPlaceholder(s); setTimeout(() => advance(s), 60000); return; }   // nothing playable: retry in a minute
+  if (s.fails >= s.list.length){                       // every clip failed in a row (often a video decoder hiccup)
+    s.fails = 0; s.errRuns = (s.errRuns || 0) + 1;
+    if (!s.v.some(v => v.classList.contains('on'))) s.phEl.style.display = '';   // only show the placeholder if nothing is on screen
+    setTimeout(() => advance(s), Math.min(30000, 3000 * s.errRuns));               // try again soon, backing off a little each time
+    return;
+  }
   const nextIdx = (s.idx + 1) % s.list.length, url = s.list[nextIdx];
   const from = s.v[s.active], to = s.v[1 - s.active];
   if (to.error) delete to.dataset.url;     // a clip that failed to load while it was waiting gets a fresh try (and is skipped if it fails again)
@@ -277,6 +282,7 @@ function advance(s){
   try { to.currentTime = 0; } catch (e) {}
   to.play().catch(() => {});
   s.active = 1 - s.active; s.idx = nextIdx; s.stuck = 0;
+  to.addEventListener('playing', () => { s.errRuns = 0; }, { once: true });
   const show = () => {
     if (to !== s.v[s.active]) return;
     s.phEl.style.display = 'none'; to.classList.add('on'); from.classList.remove('on'); from.pause();
@@ -1063,11 +1069,49 @@ const LABELS = { drive: '🏎️ Kart drive (solo / race / chase)', laser: '🔫
   pitstop: '🌭 Pit stop', flyby: '🦸 Deo flyby banner', flag: '🏁 Checkered flag', playcard: '💳 Playcard swipe', peek: '👀 Peek', tsunami: '🌊 Tsunami', fireworks: '🎆 Fireworks',
   burn: '🔥 Burn to message and back', crack: '🪟 Screen crack', confetti: '🎉 Confetti cannons', blackout: '💡 Blackout + neon', glitch: '📺 Glitch' };
 function randomEvent(){
-  const w = CONFIG.weights; let r = Math.random() * Object.values(w).reduce((a,b) => a+b, 0);
+  const w = CONFIG.weights, total = Object.values(w).reduce((a,b) => a+b, 0);
+  if (!total) return;                                   // every effect switched off
+  let r = Math.random() * total;
   for (const k in w){ if ((r -= w[k]) < 0) return EVENTS[k](); }
 }
 let nextAt = 0;
 const schedule = () => nextAt = Date.now() + rand(CONFIG.minGap, CONFIG.maxGap)*1000;
+
+/* ---------- which effects run, from effects.txt ---------- */
+const BUILTIN_WEIGHTS = { ...CONFIG.weights }, BUILTIN_GAP = [CONFIG.minGap, CONFIG.maxGap];
+async function loadEffects(){
+  let note = 'Effects: all on (no effects.txt found)';
+  try {
+    const r = await fetch('effects.txt?' + Date.now(), { cache: 'no-store' });
+    if (r.ok){
+      const w = {}, bad = []; let gap = null;
+      for (const raw of (await r.text()).split(/\r?\n/)){
+        const line = raw.replace(/#.*/, '').trim(); if (!line) continue;    // # turns a line (or the rest of it) off
+        const m = line.match(/^([a-z_]+)\s*(?:=\s*(.*))?$/i);
+        if (!m){ bad.push(line.slice(0, 20)); continue; }
+        const name = m[1].toLowerCase(), val = (m[2] || '').trim();
+        if (name === 'minutes_between'){
+          const g = val.match(/^([\d.]+)\s*(?:-|to)\s*([\d.]+)$/i) || val.match(/^([\d.]+)$/);
+          if (g){ const a = +g[1], b = +(g[2] || g[1]); gap = [Math.min(a, b) * 60, Math.max(a, b) * 60]; } else bad.push(name);
+          continue;
+        }
+        if (!(name in EVENTS)){ bad.push(name); continue; }
+        const n = val === '' ? (BUILTIN_WEIGHTS[name] || 5) : parseFloat(val);
+        if (isNaN(n) || n < 0){ bad.push(name); continue; }
+        w[name] = n;
+      }
+      CONFIG.weights = w;
+      const old = [CONFIG.minGap, CONFIG.maxGap];
+      [CONFIG.minGap, CONFIG.maxGap] = gap || BUILTIN_GAP;
+      if (old[0] !== CONFIG.minGap || old[1] !== CONFIG.maxGap) schedule();
+      const on = Object.keys(w).filter(k => w[k] > 0);
+      note = `Effects: ${on.length} on${on.length ? '' : ' (nothing will play)'} · every ${(CONFIG.minGap/60).toFixed(1)}–${(CONFIG.maxGap/60).toFixed(1)} min` + (bad.length ? ` · not recognised: ${bad.join(', ')}` : '');
+    }
+  } catch (e) {}
+  $('fxStatus').textContent = note;
+}
+loadEffects();
+setInterval(loadEffects, CONFIG.checkMinutes*60000);
 schedule();
 setInterval(() => {
   const left = Math.max(0, Math.ceil((nextAt-Date.now())/1000));
