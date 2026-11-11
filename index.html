@@ -182,7 +182,7 @@ body.kiosk{cursor:none}
   <button id="bBez">Bezels: on</button>
   <span id="status"></span>
 </div>
-<div id="info"><span id="vidStatus">Looking for videos…</span><br>Deo and the hot dog guy are rough cutouts from the promo art. Pick a surprise and hit Play, or wait and they fire on their own at random. Turn your phone sideways for a bigger view.</div>
+<div id="info"><span id="vidStatus">Looking for videos…</span> · <span id="txtStatus"></span><br><span id="nowStatus"></span><br>Deo and the hot dog guy are rough cutouts from the promo art. Pick a surprise and hit Play, or wait and they fire on their own at random. Turn your phone sideways for a bigger view.</div>
 
 <script>
 /* =================== CONFIG — edit this part =================== */
@@ -197,6 +197,7 @@ const CONFIG = {
     laserTitle:   ['LASER', 'TAG'],
     laserTagline: ['BOOK YOUR', 'GAME TODAY!'],
     laserNames:   ['DEO', 'HOT DOG'],            // used in "DEO WINS!"
+    laserWins:    'WINS!',
     bowling:      ['STRIKE!', "LET'S BOWL!"],
     invasion:     ['HIGH', 'SCORE!'],
     flag:         ['KARTING', 'RACE TODAY!'],
@@ -231,7 +232,8 @@ const rand = (a,b) => a + Math.random()*(b-a);
 const pick = arr => arr[Math.floor(Math.random()*arr.length)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const stage = $('stage');
-const kiosk = location.hash === '#kiosk';
+// Clean wall view (no controls, no status lines): when the address ends in #kiosk, or automatically on a very wide screen like the four joined TVs.
+const kiosk = location.hash === '#kiosk' || window.innerWidth >= 5000;
 if (kiosk) document.body.classList.add('kiosk','nobezel');
 
 /* ---------- video playlists: one folder per screen ---------- */
@@ -245,7 +247,8 @@ const SLOTS = [
 const VIDEO_RE = /\.(mp4|m4v|webm)$/i;
 cur.innerHTML = SLOTS.map(s => `<div class="slot ${s.cls}" id="slot_${s.key}"><div class="phwrap">${PH[s.ph]}</div><video muted playsinline preload="auto"></video><video muted playsinline preload="auto"></video></div>`).join('');
 cur.style.zIndex = 2; takeover.style.zIndex = 1; takeover.style.display = 'none';
-takeover.innerHTML = `<div class="ph p-burst" style="flex-direction:row"><div class="rays"></div><div class="vig"></div>${CONFIG.text.takeover.map(t => `<div class="big" style="width:1920px;font-size:300px">${t}</div>`).join('')}</div>`;
+function renderTakeover(){ takeover.innerHTML = `<div class="ph p-burst" style="flex-direction:row"><div class="rays"></div><div class="vig"></div>${CONFIG.text.takeover.map(t => `<div class="big" style="width:1920px;font-size:300px">${t}</div>`).join('')}</div>`; }
+renderTakeover();
 
 SLOTS.forEach(s => {
   const el = $('slot_' + s.key);
@@ -253,9 +256,10 @@ SLOTS.forEach(s => {
   s.v.forEach(v => {
     v.addEventListener('ended', () => advance(s));
     v.addEventListener('playing', () => { if (v === s.v[s.active]) s.fails = 0; });
-    v.addEventListener('error', () => { if (v === s.v[s.active] && v.dataset.url) { s.fails++; setTimeout(() => advance(s), 1500); } });
+    v.addEventListener('error', () => { if (!v.dataset.url) return; s.lastErr = clipName(v.dataset.url); if (v === s.v[s.active]) { s.fails++; setTimeout(() => advance(s), 1500); } });
   });
 });
+const clipName = u => decodeURIComponent(u.split('?')[0].split('/').pop());
 function setSrc(v, url){ if (v.dataset.url !== url){ v.dataset.url = url; v.src = url; v.load(); } }
 function showPlaceholder(s){
   s.v.forEach(v => { v.classList.remove('on'); v.pause(); v.removeAttribute('src'); delete v.dataset.url; v.load(); });
@@ -267,11 +271,12 @@ function advance(s){
   if (s.fails >= s.list.length){ s.fails = 0; showPlaceholder(s); setTimeout(() => advance(s), 60000); return; }   // nothing playable: retry in a minute
   const nextIdx = (s.idx + 1) % s.list.length, url = s.list[nextIdx];
   const from = s.v[s.active], to = s.v[1 - s.active];
+  if (to.error) delete to.dataset.url;     // a clip that failed to load while it was waiting gets a fresh try (and is skipped if it fails again)
   setSrc(to, url);
   to.loop = s.list.length === 1;
   try { to.currentTime = 0; } catch (e) {}
   to.play().catch(() => {});
-  s.active = 1 - s.active; s.idx = nextIdx;
+  s.active = 1 - s.active; s.idx = nextIdx; s.stuck = 0;
   const show = () => {
     if (to !== s.v[s.active]) return;
     s.phEl.style.display = 'none'; to.classList.add('on'); from.classList.remove('on'); from.pause();
@@ -310,6 +315,15 @@ async function fetchLists(){
     .map(f => f.path.split('/').map(encodeURIComponent).join('/') + (f.v ? '?v=' + f.v : ''));
   return lists;
 }
+// Safety net: if a screen's clip has not moved for about 20 seconds, move that screen on to its next clip.
+setInterval(() => SLOTS.forEach(s => {
+  if (!s.list.length || s.idx < 0) return;
+  const t = s.v[s.active].currentTime;
+  if (t !== s.lastT){ s.lastT = t; s.stuck = 0; return; }
+  if (++s.stuck >= 5){ s.stuck = 0; s.fails++; s.restarts = (s.restarts || 0) + 1; advance(s); }
+}), 4000);
+setInterval(() => { $('nowStatus').textContent = 'Now playing: ' + SLOTS.map(s => s.key + ' ' + (s.idx < 0 || !s.list.length ? 'placeholder' : `${clipName(s.list[s.idx])} (${s.idx+1} of ${s.list.length})`)
+  + (s.lastErr ? ` [could not play ${s.lastErr}]` : '') + (s.restarts ? ` [${s.restarts} stall restarts]` : '')).join(' · '); }, 2000);
 let lastSig = null, pendingApply = null, listNote = '';
 function applyAll(lists){
   SLOTS.forEach(s => applyList(s, lists[s.key] || []));
@@ -705,8 +719,9 @@ async function laserTag(){
   const A = LT_A, B = LT_B, dim = $('ltDim'), ban = $('ltBanner');
   A.scoreEl = $('ltScA'); B.scoreEl = $('ltScB');
   for (const c of [A,B]){ c.score = 0; c.scoreEl.textContent = '0'; c.el.style.display = 'block'; }
-  $('ltSubL').textContent = TXT.laserTagline[0]; $('ltSubR').textContent = TXT.laserTagline[1];
-  ban.querySelectorAll('.w').forEach((w, i) => w.textContent = TXT.laserTitle[i]);
+  $('ltSubL').innerHTML = TXT.laserTagline[0]; $('ltSubR').innerHTML = TXT.laserTagline[1];
+  ban.querySelectorAll('.w').forEach((w, i) => w.innerHTML = TXT.laserTitle[i]);
+  A.name = TXT.laserNames[0]; B.name = TXT.laserNames[1];
   ban.style.display = 'block';
   const pop = 'cubic-bezier(.2,1.5,.4,1)';
   dim.animate([{opacity:0},{opacity:1}],{duration:500,fill:'forwards'});
@@ -726,7 +741,7 @@ async function laserTag(){
     await sleep(rand(280, 520));
   }
   const win = A.score >= 3 ? A : B, lose = win === A ? B : A, dir = lose === A ? -1 : 1;
-  $('ltSubL').textContent = win.name; $('ltSubR').textContent = 'WINS!';
+  $('ltSubL').innerHTML = win.name; $('ltSubR').innerHTML = TXT.laserWins;
   ban.querySelector('.sub').animate([{transform:'scale(1.25)'},{transform:'scale(1)'}],{duration:300,iterations:4,direction:'alternate'});
   const fall = lose.el.animate([{transform:'translate(0,0) rotate(0)'},{transform:`translate(${dir*160}px,-220px) rotate(${dir*200}deg)`,offset:.35},{transform:`translate(${dir*320}px,1300px) rotate(${dir*720}deg)`}],{duration:1100,easing:'ease-in',fill:'forwards'});
   win.el.animate([{transform:'translateY(0)'},{transform:'translateY(-110px)'},{transform:'translateY(0)'}],{duration:420,iterations:4,easing:'ease-in-out'});
@@ -1007,6 +1022,37 @@ const deoFlyby = fxWrap(async () => {
   await fin(el, [0,.25,.5,.75,1].map((p,i) => ({transform:`translate(${-3100 + 11000*p}px,${[0,-70,30,-50,10][i]}px)`, offset:p})), {duration:9000, easing:'linear', fill:'forwards'});
   el.remove();
 });
+
+/* ---------- wording from text.txt ---------- */
+// text.txt sits next to this page. Each line is  name = words.  A | splits the words into parts; " / " starts a new line.
+const TEXT_KEYS = { laser_title: 'laserTitle', laser_tagline: 'laserTagline', laser_names: 'laserNames', laser_wins: 'laserWins', bowling: 'bowling', high_score: 'invasion',
+  karting: 'flag', bonk: 'bonk', flyby_banner: 'flyby', pitstop_sign: 'pitstop', playcard: 'playcard', neon_signs: 'neon', burn_message: 'takeover' };
+const escText = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\s+\/\s+/g, '<br>');
+async function loadText(){
+  let note = 'Wording: built in (no text.txt found)';
+  try {
+    const r = await fetch('text.txt?' + Date.now(), { cache: 'no-store' });
+    if (r.ok){
+      const bad = []; let n = 0;
+      for (const raw of (await r.text()).split(/\r?\n/)){
+        const line = raw.trim(); if (!line || line.startsWith('#')) continue;
+        const eq = line.indexOf('='); if (eq < 0){ bad.push(line.slice(0, 20)); continue; }
+        const key = TEXT_KEYS[line.slice(0, eq).trim().toLowerCase()], val = line.slice(eq + 1).trim();
+        if (!key){ bad.push(line.slice(0, eq).trim()); continue; }
+        if (!val) continue;                                     // blank value: keep the built-in words
+        const parts = val.split('|').map(p => escText(p.trim()));
+        if (Array.isArray(TXT[key])) TXT[key] = TXT[key].map((old, i) => parts[i] || old);   // missing parts keep the built-in words
+        else TXT[key] = parts[0];
+        n++;
+      }
+      renderTakeover();
+      note = `Wording: ${n} lines from text.txt` + (bad.length ? ` · not recognised: ${bad.join(', ')}` : '');
+    }
+  } catch (e) {}
+  $('txtStatus').textContent = note;
+}
+loadText();
+setInterval(loadText, CONFIG.checkMinutes*60000);
 
 /* ---------- random scheduler ---------- */
 const EVENTS = { drive: driveMascot, laser: laserTag, bowling: bowlingStrike, invasion: arcadeInvasion, bumper: bumperCars, pitstop: pitStop,
