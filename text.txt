@@ -22,9 +22,9 @@
 # Big title: left half | right half
 laser_title = LASER | TAG
 # Line under the title: left half | right half
-laser_tagline = BATTLE | TODAY!
-# The two players' names: Deo's side | Turbo's side
-laser_names = DEO | TURBO
+laser_tagline = BOOK YOUR | GAME TODAY!
+# The two players' names: Deo's side | hot dog guy's side
+laser_names = DEO | HOT DOG
 # Shown after the winner's name
 laser_wins = WINS!
 
@@ -48,12 +48,9 @@ bonk = BONK!
 flyby_banner = BOOK YOUR PARTY TODAY!
 
 # --- PIT STOP SIGN ---
-# top line | big middle text | bottom line
-pitstop_sign = ★ THE PITSTOP ★ | TIME FOR A BREAK! | Dogs & Subs — grab one now
-
-# --- PLAYCARD SWIPE ---
-# top of card | big text | bottom of card
-playcard = DEZERLAND PARK | PLAYCARD | ARCADE • BOWLING • KARTING
+# The Pitstop logo sits on top (swap the picture by replacing pitstop-logo.png).
+# Big line under the logo | optional small line (leave it off for no small line)
+pitstop_text = TAKE A BREAK
 
 # --- BLACKOUT NEON SIGNS ---
 # One sign per TV, left to right: TV 1 | TV 2 | TV 3 | TV 4
