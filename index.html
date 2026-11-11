@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dezerland 4-Screen Wall — Prototype</title>
+<title>Dezerland Bowling Counter Display</title>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Russo+One&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -15,7 +15,9 @@ body{display:flex;flex-direction:column;justify-content:center}
 .layer{position:absolute;inset:0;-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
 .slot{position:absolute;top:0;height:1080px;overflow:hidden}
 .slot.left{left:0;width:1920px}.slot.center{left:1920px;width:3840px}.slot.right{left:5760px;width:1920px}
-.slot video{width:100%;height:100%;object-fit:cover;display:block}
+.slot video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;opacity:0;background:#000}
+.slot video.on{opacity:1}
+.phwrap{position:absolute;inset:0}
 #fire{position:absolute;left:0;top:0;width:7680px;height:1080px;pointer-events:none;z-index:5;display:none}
 #mascotLayer{position:absolute;inset:0;z-index:10;pointer-events:none}
 #bezels{position:absolute;inset:0;z-index:20;pointer-events:none}
@@ -180,7 +182,7 @@ body.kiosk{cursor:none}
   <button id="bBez">Bezels: on</button>
   <span id="status"></span>
 </div>
-<div id="info">Prototype: placeholder videos. Deo and the hot dog guy are rough cutouts from the promo art. Pick a surprise and hit Play, or wait and they fire on their own at random. Turn your phone sideways for a bigger view.</div>
+<div id="info"><span id="vidStatus">Looking for videos…</span><br>Deo and the hot dog guy are rough cutouts from the promo art. Pick a surprise and hit Play, or wait and they fire on their own at random. Turn your phone sideways for a bigger view.</div>
 
 <script>
 /* =================== CONFIG — edit this part =================== */
@@ -203,20 +205,19 @@ const CONFIG = {
     pitstop:      ['★ THE PITSTOP ★', 'HOT DOG<br>BREAK!', 'Dogs & Subs — grab one now'],
     playcard:     ['DEZERLAND PARK', 'PLAYCARD', 'ARCADE • BOWLING • KARTING'],
     neon:         ['ARCADE', 'BOWLING', 'KARTING', 'LASER<br>TAG'],
+    takeover:     ['PLAY', 'BOWL', 'RACE', 'REPEAT!'],   // one word per TV, shown when the wall burns away
   },
   burnSeconds: 4.5,
-  // Each set = what plays on Screen 1 | Screens 2+3 | Screen 4. Use {video:'media/file.mp4'} for real files.
-  sets: [
-    { left:{ph:'playcard'}, center:{ph:'burst'}, right:{ph:'arcade'} },
-    { left:{ph:'bowling'},  center:{ph:'deal'},  right:{ph:'kart'} },
-  ]
+  takeoverSeconds: 7,        // how long the full-wall message stays up during the burn
+  checkMinutes: 5,           // how often to look for added, removed or replaced videos
+  applyDelaySeconds: 120,    // wait this long before using a change, so GitHub has time to publish the file
 };
 /* =============================================================== */
 
 const PH = {
-  playcard:`<div class="ph p-playcard"><div class="big">GET YOUR<br>PLAYCARD<br>HERE</div><div class="marquee">ARCADE • BOWLING • KARTING • LASER TAG • BUMPER CARS • POOL • &nbsp;ARCADE • BOWLING • KARTING • LASER TAG • BUMPER CARS • POOL • &nbsp;</div><div class="tag">SCREEN 1 · VIDEO</div></div>`,
-  burst:`<div class="ph p-burst"><div class="rays"></div><div class="vig"></div><div class="big">GET<br>PLAYCARD<br>HERE</div><div class="tag">SCREENS 2+3 · WIDE VIDEO</div></div>`,
-  arcade:`<div class="ph p-arcade"><div class="sun"></div><div class="grid"></div><div class="big">ARCADE</div><div class="sub">PIXEL GAMES</div><div class="tag">SCREEN 4 · VIDEO</div></div>`,
+  playcard:`<div class="ph p-playcard"><div class="big">GET YOUR<br>PLAYCARD<br>HERE</div><div class="marquee">ARCADE • BOWLING • KARTING • LASER TAG • BUMPER CARS • POOL • &nbsp;ARCADE • BOWLING • KARTING • LASER TAG • BUMPER CARS • POOL • &nbsp;</div><div class="tag">NO VIDEO YET · ADD ONE TO THE screen1 FOLDER</div></div>`,
+  burst:`<div class="ph p-burst"><div class="rays"></div><div class="vig"></div><div class="big">GET<br>PLAYCARD<br>HERE</div><div class="tag">NO VIDEO YET · ADD A 3840×1080 ONE TO THE screen2 FOLDER</div></div>`,
+  arcade:`<div class="ph p-arcade"><div class="sun"></div><div class="grid"></div><div class="big">ARCADE</div><div class="sub">PIXEL GAMES</div><div class="tag">NO VIDEO YET · ADD ONE TO THE screen3 FOLDER</div></div>`,
   bowling:`<div class="ph p-bowling"><div class="lane"></div><div class="ball"></div><div class="big">BOWLING</div><div class="sub">ORLANDO</div><div class="tag">SCREEN 1 · VIDEO</div></div>`,
   deal:`<div class="ph p-deal"><div class="stripes"></div><div class="chev" style="left:0"></div><div class="chev" style="right:0"></div><div class="get">GET</div><div class="amt">$100</div><div class="free">FREE</div><div class="fine">When you purchase a $200 Playcard</div><div class="tag" style="left:150px">SCREENS 2+3 · WIDE VIDEO</div></div>`,
   kart:`<div class="ph p-kart"><div class="panel"><div class="big">KARTING</div><div class="sub">PRO TRACK · CADET TRACK</div></div><div class="tag" style="color:#000">SCREEN 4 · VIDEO</div></div>`,
@@ -228,23 +229,111 @@ const PH = {
 const $ = id => document.getElementById(id);
 const rand = (a,b) => a + Math.random()*(b-a);
 const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 const stage = $('stage');
 const kiosk = location.hash === '#kiosk';
 if (kiosk) document.body.classList.add('kiosk','nobezel');
 
-/* ---------- content layers ---------- */
-let cur = $('layerA'), nxt = $('layerB'), setIdx = 0;
-function slotHTML(item, cls){
-  if (item.video) return `<div class="slot ${cls}"><video src="${item.video}" muted autoplay loop playsinline></video></div>`;
-  return `<div class="slot ${cls}">${PH[item.ph]||''}</div>`;
-}
-function loadSet(layer, i){
-  const s = CONFIG.sets[i % CONFIG.sets.length];
-  layer.innerHTML = slotHTML(s.left,'left') + slotHTML(s.center,'center') + slotHTML(s.right,'right');
-}
-loadSet(cur, 0); loadSet(nxt, 1);
-cur.style.zIndex = 2; nxt.style.zIndex = 1;
+/* ---------- video playlists: one folder per screen ---------- */
+const cur = $('layerA');                 // the video layer (always there)
+const takeover = $('layerB');            // full-wall message the burn reveals
+const SLOTS = [
+  { key: 'screen1', cls: 'left',   ph: 'playcard', label: 'Left TV' },
+  { key: 'screen2', cls: 'center', ph: 'burst',    label: 'Middle two TVs' },
+  { key: 'screen3', cls: 'right',  ph: 'arcade',   label: 'Right TV' },
+];
+const VIDEO_RE = /\.(mp4|m4v|webm)$/i;
+cur.innerHTML = SLOTS.map(s => `<div class="slot ${s.cls}" id="slot_${s.key}"><div class="phwrap">${PH[s.ph]}</div><video muted playsinline preload="auto"></video><video muted playsinline preload="auto"></video></div>`).join('');
+cur.style.zIndex = 2; takeover.style.zIndex = 1; takeover.style.display = 'none';
+takeover.innerHTML = `<div class="ph p-burst" style="flex-direction:row"><div class="rays"></div><div class="vig"></div>${CONFIG.text.takeover.map(t => `<div class="big" style="width:1920px;font-size:300px">${t}</div>`).join('')}</div>`;
 
+SLOTS.forEach(s => {
+  const el = $('slot_' + s.key);
+  Object.assign(s, { phEl: el.querySelector('.phwrap'), v: [...el.querySelectorAll('video')], list: [], idx: -1, active: 0, fails: 0 });
+  s.v.forEach(v => {
+    v.addEventListener('ended', () => advance(s));
+    v.addEventListener('playing', () => { if (v === s.v[s.active]) s.fails = 0; });
+    v.addEventListener('error', () => { if (v === s.v[s.active] && v.dataset.url) { s.fails++; setTimeout(() => advance(s), 1500); } });
+  });
+});
+function setSrc(v, url){ if (v.dataset.url !== url){ v.dataset.url = url; v.src = url; v.load(); } }
+function showPlaceholder(s){
+  s.v.forEach(v => { v.classList.remove('on'); v.pause(); v.removeAttribute('src'); delete v.dataset.url; v.load(); });
+  s.phEl.style.display = ''; s.idx = -1;
+}
+// Move a screen to its next clip. Two players are stacked: one plays while the other has the next clip loaded and waiting, so the switch has no black flash.
+function advance(s){
+  if (!s.list.length) return showPlaceholder(s);
+  if (s.fails >= s.list.length){ s.fails = 0; showPlaceholder(s); setTimeout(() => advance(s), 60000); return; }   // nothing playable: retry in a minute
+  const nextIdx = (s.idx + 1) % s.list.length, url = s.list[nextIdx];
+  const from = s.v[s.active], to = s.v[1 - s.active];
+  setSrc(to, url);
+  to.loop = s.list.length === 1;
+  try { to.currentTime = 0; } catch (e) {}
+  to.play().catch(() => {});
+  s.active = 1 - s.active; s.idx = nextIdx;
+  const show = () => {
+    if (to !== s.v[s.active]) return;
+    s.phEl.style.display = 'none'; to.classList.add('on'); from.classList.remove('on'); from.pause();
+    if (s.list.length > 1) setSrc(from, s.list[(s.idx + 1) % s.list.length]);   // get the following clip ready
+  };
+  if (to.readyState >= 2) show(); else to.addEventListener('playing', show, { once: true });
+}
+function applyList(s, list){
+  if (list.length === s.list.length && list.every((u, i) => u === s.list[i])) return;
+  const playing = s.idx >= 0 ? s.list[s.idx] : null, v = s.v[s.active];
+  s.list = list; s.fails = 0;
+  s.idx = playing ? list.indexOf(playing) : -1;
+  if (!list.length || !playing || v.paused || v.ended) return advance(s);   // nothing on screen yet: start now
+  v.loop = false;                                                           // otherwise let the current clip finish first
+  if (list.length > 1) setSrc(s.v[1 - s.active], list[(s.idx + 1) % list.length]);
+}
+// Where the list of videos comes from: on GitHub Pages, ask GitHub what is in the screen folders. Anywhere else, read playlist.json.
+async function fetchLists(){
+  const lists = { screen1: [], screen2: [], screen3: [] }, host = location.hostname;
+  if (host.endsWith('.github.io')){
+    const owner = host.split('.')[0], repo = location.pathname.split('/')[1] || host;
+    let r = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/main?recursive=1`, { cache: 'no-store' });
+    if (r.status === 404) r = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/master?recursive=1`, { cache: 'no-store' });
+    if (!r.ok) throw new Error('GitHub ' + r.status);
+    for (const f of (await r.json()).tree){
+      const m = f.type === 'blob' && f.path.match(/^(screen[123])\/([^\/]+)$/i);
+      if (m && VIDEO_RE.test(m[2])) lists[m[1].toLowerCase()].push({ path: f.path, v: f.sha.slice(0, 8) });
+    }
+  } else {
+    const r = await fetch('playlist.json?' + Date.now());
+    if (!r.ok) throw new Error('playlist.json ' + r.status);
+    const j = await r.json();
+    for (const k in lists) lists[k] = (j[k] || []).filter(n => VIDEO_RE.test(n)).map(n => ({ path: k + '/' + n, v: '' }));
+  }
+  for (const k in lists) lists[k] = lists[k].sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: 'base' }))
+    .map(f => f.path.split('/').map(encodeURIComponent).join('/') + (f.v ? '?v=' + f.v : ''));
+  return lists;
+}
+let lastSig = null, pendingApply = null, listNote = '';
+function applyAll(lists){
+  SLOTS.forEach(s => applyList(s, lists[s.key] || []));
+  $('vidStatus').textContent = 'Videos found: ' + SLOTS.map(s => `${s.key} ${(lists[s.key] || []).length || 'none (placeholder)'}`).join(' · ') + listNote;
+}
+async function refreshLists(first){
+  let lists; listNote = '';
+  try { lists = await fetchLists(); try { localStorage.setItem('wallLists', JSON.stringify(lists)); } catch (e) {} }
+  catch (err){
+    if (first !== true) return;                    // a failed re-check changes nothing; keep playing what we have
+    try { lists = JSON.parse(localStorage.getItem('wallLists')); } catch (e) {}
+    listNote = lists ? ' (offline: using the last list this browser saw)' : '';
+    if (!lists){ $('vidStatus').textContent = 'Could not read the video folders (' + err.message + '). Showing placeholders.'; return; }
+  }
+  const sig = JSON.stringify(lists);
+  if (first === true){ lastSig = sig; applyAll(lists); }
+  else if (sig !== lastSig){
+    lastSig = sig; clearTimeout(pendingApply);
+    // GitHub lists a new file a minute or so before the site can serve it, so wait before using a change.
+    pendingApply = setTimeout(() => applyAll(lists), location.hostname.endsWith('.github.io') ? CONFIG.applyDelaySeconds*1000 : 0);
+  }
+}
+refreshLists(true);
+setInterval(refreshLists, CONFIG.checkMinutes*60000);
 
 /* ---------- scaling / preview ---------- */
 let zoom = false;
@@ -512,7 +601,7 @@ function renderBurn(t){
   }
   mctx.putImageData(maskImg,0,0);
   const url = `url(${maskC.toDataURL()})`;
-  cur.style.webkitMaskImage = url; cur.style.maskImage = url;
+  burnLayer.style.webkitMaskImage = url; burnLayer.style.maskImage = url;
 }
 function drawEmbers(){
   embers = embers.filter(e => (e.life -= 0.02) > 0);
@@ -522,37 +611,48 @@ function drawEmbers(){
     fctx.fillRect(e.x, e.y, 1, 1);
   }
 }
-function burn(){
-  if (busy) return; busy = true;
-  buildField();
-  nxt.querySelectorAll('video').forEach(v => { v.currentTime = 0; v.play().catch(()=>{}); });
-  fire.style.display = 'block';
-  const start = performance.now(), D = CONFIG.burnSeconds*1000;
-  function frame(now){
-    const p = Math.min(1, (now-start)/D);
-    const t = -0.03 + 1.15 * (p<.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2) ;
-    renderBurn(t);
-    if (p < 1) return requestAnimationFrame(frame);
-    // swap layers
-    cur.style.webkitMaskImage = cur.style.maskImage = '';
-    const old = cur; cur = nxt; nxt = old;
-    cur.style.zIndex = 2; nxt.style.zIndex = 1;
-    setIdx = (setIdx+1) % CONFIG.sets.length;
-    loadSet(nxt, setIdx+1);
-    // let embers finish
-    const fadeStart = performance.now();
+let burnLayer = cur;
+function burnPass(layer){
+  return new Promise(res => {
+    burnLayer = layer; buildField();
+    fire.style.display = 'block';
+    const start = performance.now(), D = CONFIG.burnSeconds*1000;
+    (function frame(now){
+      const p = Math.min(1, Math.max(0, (now-start)/D));
+      renderBurn(-0.03 + 1.15 * (p<.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2));
+      if (p < 1) return requestAnimationFrame(frame);
+      res();
+    })(start);
+  });
+}
+function burnTail(){
+  return new Promise(res => {
+    const t0 = performance.now();
     (function tail(n){
       fctx.clearRect(0,0,FW,FH); drawEmbers();
-      if (n - fadeStart < 1000 && embers.length) return requestAnimationFrame(tail);
-      fctx.clearRect(0,0,FW,FH); fire.style.display='none'; embers=[]; busy=false;
-    })(performance.now());
-  }
-  requestAnimationFrame(frame);
+      if (n - t0 < 1000 && embers.length) return requestAnimationFrame(tail);
+      fctx.clearRect(0,0,FW,FH); fire.style.display = 'none'; embers = []; res();
+    })(t0);
+  });
+}
+// The videos burn away to a full-wall message, then the message burns away and the videos are back. The videos never stop.
+async function burn(){
+  if (busy) return; busy = true;
+  takeover.style.display = 'block';
+  await burnPass(cur);
+  takeover.style.zIndex = 2; cur.style.zIndex = 1;
+  cur.style.webkitMaskImage = cur.style.maskImage = '';
+  await burnTail();
+  await sleep(CONFIG.takeoverSeconds*1000);
+  await burnPass(takeover);
+  cur.style.zIndex = 2; takeover.style.zIndex = 1; takeover.style.display = 'none';
+  takeover.style.webkitMaskImage = takeover.style.maskImage = '';
+  await burnTail();
+  busy = false;
 }
 
 
 /* ---------- laser tag ---------- */
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 const CH = 860, GW = 330, GS = GW/300;
 function ltSetup(id, cx, aspect, grip, chest, color, flip, name){
   const el = $(id), w = CH*aspect, x = cx - w/2, y = 1080 - CH;
@@ -913,7 +1013,7 @@ const EVENTS = { drive: driveMascot, laser: laserTag, bowling: bowlingStrike, in
   flyby: deoFlyby, flag: checkeredFlag, playcard: playcardSwipe, peek, tsunami, fireworks, burn, crack: screenCrack, confetti, blackout, glitch };
 const LABELS = { drive: '🏎️ Kart drive (solo / race / chase)', laser: '🔫 Laser tag battle', bowling: '🎳 Bowling strike', invasion: '👾 Arcade invasion', bumper: '💥 Bumper cars',
   pitstop: '🌭 Pit stop', flyby: '🦸 Deo flyby banner', flag: '🏁 Checkered flag', playcard: '💳 Playcard swipe', peek: '👀 Peek', tsunami: '🌊 Tsunami', fireworks: '🎆 Fireworks',
-  burn: '🔥 Burn transition', crack: '🪟 Screen crack', confetti: '🎉 Confetti cannons', blackout: '💡 Blackout + neon', glitch: '📺 Glitch' };
+  burn: '🔥 Burn to message and back', crack: '🪟 Screen crack', confetti: '🎉 Confetti cannons', blackout: '💡 Blackout + neon', glitch: '📺 Glitch' };
 function randomEvent(){
   const w = CONFIG.weights; let r = Math.random() * Object.values(w).reduce((a,b) => a+b, 0);
   for (const k in w){ if ((r -= w[k]) < 0) return EVENTS[k](); }
