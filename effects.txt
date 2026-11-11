@@ -35,7 +35,7 @@ flag = 6           # checkered flag wipe and a kart race
 
 # --- Big effects ---
 tsunami = 6        # wave with a surfing mascot (heavy)
-fireworks = 6      # fireworks over the wall (heavy)
+# fireworks = 6      # fireworks over the wall (heavy)
 # confetti = 5       # confetti cannons (heavy)
 burn = 5           # wall burns to the message, then back (heavy)
 crack = 5          # mascot smacks the glass and it cracks
