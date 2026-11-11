@@ -49,7 +49,7 @@ flyby_banner = BOOK YOUR PARTY TODAY!
 
 # --- PIT STOP SIGN ---
 # top line | big middle text | bottom line
-pitstop_sign = ★ THE PITSTOP ★ | HOT DOG / BREAK! | Dogs & Subs — grab one now
+pitstop_sign = ★ THE PITSTOP ★ | TIME FOR A BREAK! | Dogs & Subs — grab one now
 
 # --- PLAYCARD SWIPE ---
 # top of card | big text | bottom of card
