@@ -1,0 +1,64 @@
+# ============================================================
+#  WORDS SHOWN ON THE BOWLING COUNTER DISPLAY
+# ============================================================
+#
+#  HOW TO CHANGE SOMETHING
+#   1. Click the pencil icon (top right of this file on GitHub).
+#   2. Change only the words AFTER the = sign on a line.
+#   3. Click "Commit changes". The display updates in about 10 minutes.
+#
+#  RULES
+#   - Do not change the name before the = sign.
+#   - A  |  splits a line into parts. Keep the same number of parts.
+#     (The two middle TVs have a gap between them, so big banners are
+#      split into a left half and a right half.)
+#   - Put  /  with a space on each side to start a new line of text.
+#   - Lines that start with # are notes like this one and are ignored.
+#   - If you delete a line or leave it blank, the original words are used.
+#
+# ============================================================
+
+# --- LASER TAG BATTLE ---
+# Big title: left half | right half
+laser_title = LASER | TAG
+# Line under the title: left half | right half
+laser_tagline = BOOK YOUR | GAME TODAY!
+# The two players' names: Deo's side | hot dog guy's side
+laser_names = DEO | HOT DOG
+# Shown after the winner's name
+laser_wins = WINS!
+
+# --- BOWLING STRIKE ---
+# left half | right half
+bowling = STRIKE! | LET'S BOWL!
+
+# --- ARCADE INVASION ---
+# left half | right half
+high_score = HIGH | SCORE!
+
+# --- CHECKERED FLAG RACE ---
+# left half | right half
+karting = KARTING | RACE TODAY!
+
+# --- BUMPER CARS ---
+bonk = BONK!
+
+# --- DEO FLYBY ---
+# The banner Deo tows across all four TVs
+flyby_banner = BOOK YOUR PARTY TODAY!
+
+# --- PIT STOP SIGN ---
+# top line | big middle text | bottom line
+pitstop_sign = ★ THE PITSTOP ★ | HOT DOG / BREAK! | Dogs & Subs — grab one now
+
+# --- PLAYCARD SWIPE ---
+# top of card | big text | bottom of card
+playcard = DEZERLAND PARK | PLAYCARD | ARCADE • BOWLING • KARTING
+
+# --- BLACKOUT NEON SIGNS ---
+# One sign per TV, left to right: TV 1 | TV 2 | TV 3 | TV 4
+neon_signs = ARCADE | BOWLING | KARTING | LASER / TAG
+
+# --- BURN MESSAGE ---
+# Shown across the wall when the videos burn away. One word per TV, left to right.
+burn_message = PLAY | BOWL | RACE | REPEAT!
