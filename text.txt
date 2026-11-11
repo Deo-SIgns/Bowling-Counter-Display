@@ -22,7 +22,7 @@
 # Big title: left half | right half
 laser_title = LASER | TAG
 # Line under the title: left half | right half
-laser_tagline = BOOK YOUR | GAME TODAY!
+laser_tagline = BATTLE | TODAY!
 # The two players' names: Deo's side | hot dog guy's side
 laser_names = DEO | HOT DOG
 # Shown after the winner's name
