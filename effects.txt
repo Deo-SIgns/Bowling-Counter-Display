@@ -20,10 +20,10 @@
 minutes_between = .25 - .75
 
 # --- Characters ---
-peek = 12          # Deo or the hot dog guy pops in from an edge and ducks out
+peek = 12          # Deo or Turbo pops in from an edge and ducks out
 drive = 12         # go-karts drive across: solo, race or chase
-bumper = 7         # bumper cars collide in the middle (BONK!)
-pitstop = 7        # hot dog guy pulls over with the Pitstop sign
+bumper = 7         # Turbo and Deo collide in bumper cars (BONK!)
+pitstop = 7        # Turbo runs in and points at the Pitstop sign
 flyby = 7          # Deo flies across towing a banner
 laser = 9          # laser tag battle (heavy)
 
